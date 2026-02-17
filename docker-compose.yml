@@ -27,15 +27,15 @@ services:
               count: 1
               capabilities: [gpu]
 
-  cpu:
-    <<: *common
-    environment:
-      <<: *common-env
-      DEVICE: cpu
-      OMP_NUM_THREADS: "64"
-      MKL_NUM_THREADS: "64"
-      OMP_PROC_BIND: CLOSE
-      OMP_SCHEDULE: STATIC
+  # cpu:
+  #   <<: *common
+  #   environment:
+  #     <<: *common-env
+  #     DEVICE: cpu
+  #     OMP_NUM_THREADS: "64"
+  #     MKL_NUM_THREADS: "64"
+  #     OMP_PROC_BIND: CLOSE
+  #     OMP_SCHEDULE: STATIC
 
   test:
     build:

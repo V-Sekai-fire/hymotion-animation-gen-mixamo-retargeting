@@ -48,7 +48,7 @@ The fix: when running on CPU, we explicitly cast all model pipelines to float32 
 # GPU (recommended)
 docker compose up
 
-# CPU (slow but works)
+# CPU (slow but works). Uncomment docker compose.
 DEVICE=cpu docker compose up
 ```
 
