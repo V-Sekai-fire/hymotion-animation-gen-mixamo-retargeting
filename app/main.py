@@ -5,7 +5,7 @@ FastAPI service that wraps Tencent HY-Motion 1.0 for text-to-animation generatio
 with SMPL → Mixamo/RPM retargeting built in.
 
 Endpoints:
-    POST /generate         — Generate animation from text prompt
+    POST /generate         — Generate animation from text prompt (JSON)
     GET  /health           — Health check
     GET  /animations/{id}  — Download a previously generated animation
 """
@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -27,7 +27,6 @@ from pydantic import BaseModel, Field
 from app import config
 from app.motion_generator import get_generator
 from app.retargeter import (
-    extract_rest_from_glb,
     export_bvh,
     export_glb_animation,
     export_gltf_animation,
@@ -119,7 +118,7 @@ async def health():
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(req: GenerateRequest):
-    """Generate animation from JSON body (no custom rig)."""
+    """Generate animation from JSON body."""
     return await _generate(
         prompt=req.prompt,
         duration=req.duration,
@@ -129,39 +128,6 @@ async def generate(req: GenerateRequest):
         zero_root_xz=req.zero_root_xz,
         scale=req.scale,
         loop=req.loop,
-        avatar_glb_bytes=None,
-    )
-
-
-@app.post("/generate/upload", response_model=GenerateResponse)
-async def generate_with_upload(
-    prompt: str = Form(...),
-    duration: float | None = Form(None),
-    cfg_scale: float = Form(config.DEFAULT_CFG_SCALE),
-    seed: int | None = Form(None),
-    format: str = Form("glb"),
-    zero_root_xz: bool = Form(False),
-    scale: float = Form(1.0),
-    loop: bool = Form(False),
-    avatar_glb: UploadFile | None = File(None),
-):
-    """Generate animation from multipart form data (supports custom rig GLB upload)."""
-    avatar_bytes = None
-    if avatar_glb is not None:
-        avatar_bytes = await avatar_glb.read()
-        if len(avatar_bytes) == 0:
-            avatar_bytes = None
-
-    return await _generate(
-        prompt=prompt,
-        duration=duration,
-        cfg_scale=cfg_scale,
-        seed=seed,
-        format=format,
-        zero_root_xz=zero_root_xz,
-        scale=scale,
-        loop=loop,
-        avatar_glb_bytes=avatar_bytes,
     )
 
 
@@ -174,9 +140,8 @@ async def _generate(
     zero_root_xz: bool,
     scale: float,
     loop: bool,
-    avatar_glb_bytes: bytes | None,
 ) -> GenerateResponse:
-    """Shared generation logic for both JSON and multipart endpoints."""
+    """Shared generation logic."""
     generator = get_generator()
 
     if not generator._loaded:
@@ -192,23 +157,13 @@ async def _generate(
 
     fps = result["fps"]
 
-    # Extract custom rest pose from avatar GLB if provided
-    rest_rotations = None
-    if avatar_glb_bytes is not None:
-        try:
-            rest_rotations = extract_rest_from_glb(avatar_glb_bytes)
-        except Exception as e:
-            logger.warning(f"Failed to extract rest pose from avatar GLB: {e}")
-            # Fall back to RPM defaults
-
-    # Retarget SMPL → Mixamo
+    # Retarget SMPL → Mixamo (default RPM rest pose)
     retargeted = retarget_to_mixamo(
         rot6d=result["rot6d"],
         transl=result["transl"],
         fps=fps,
         zero_root_xz=zero_root_xz,
         scale=scale,
-        rest_rotations=rest_rotations,
     )
 
     # Apply loop crossfade if requested

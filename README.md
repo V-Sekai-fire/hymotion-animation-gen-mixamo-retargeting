@@ -80,15 +80,6 @@ curl -X POST http://localhost:8100/generate \
   }' | jq .
 ```
 
-Generate with a custom avatar rig (multipart upload):
-
-```bash
-curl -X POST http://localhost:8100/generate/upload \
-  -F "prompt=A person is walking" \
-  -F "format=glb" \
-  -F "avatar_glb=@my_avatar.glb"
-```
-
 Health check:
 
 ```bash
